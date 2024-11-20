@@ -291,27 +291,27 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
             break;
         }
         
-        // emissive
+        // Emissive
         if (light > 0.0) {
             var emissive_behaviour = emmisive(record.object_color.xyz, light);
             light_color += accumulated_color * emissive_behaviour.direction;
             break;
         }
         if (smoothness < 0.0) {
-            // Dielectric material
-            var dielectric_response = dielectric(record.normal, active_ray.direction, specular, record.frontface, rng_next_vec3_in_unit_sphere(rng_state), absorption, rng_state); 
-            behaviour = dielectric_response;
+            // Dielectric
+            var dielectric_behaviour = dielectric(record.normal, active_ray.direction, specular, record.frontface, rng_next_vec3_in_unit_sphere(rng_state), absorption, rng_state); 
+            behaviour = dielectric_behaviour;
             record.p = record.p - 0.01 * record.normal;
         }
         else{
-          // metal 
+          // Metal 
           if (specular_prob < specular) {
-              var metal_response = metal(record.normal, active_ray.direction, absorption, rng_next_vec3_in_unit_sphere(rng_state));
-              behaviour = metal_response;
+              var metal_behaviour = metal(record.normal, active_ray.direction, absorption, rng_next_vec3_in_unit_sphere(rng_state));
+              behaviour = metal_behaviour;
           } else {
-          // lambertian
-            var lambertian_response = lambertian(record.normal, absorption, rng_next_vec3_in_unit_sphere(rng_state), rng_state);
-            behaviour = lambertian_response;
+          // Lambertian
+            var lambertian_behaviour = lambertian(record.normal, absorption, rng_next_vec3_in_unit_sphere(rng_state), rng_state);
+            behaviour = lambertian_behaviour;
           }
           accumulated_color *= mix(record.object_color.xyz,vec3f(1.0), specular); 
         }
@@ -337,24 +337,20 @@ fn render(@builtin(global_invocation_id) id : vec3u)
     var rez = uniforms[1];
     var time = u32(uniforms[0]);
 
-    // init_rng (random number generator) we pass the pixel position, resolution and frame
     var rng_state = init_rng(vec2(id.x, id.y), vec2(u32(rez)), time);
 
-    // Get uv
     var fragCoord = vec2f(f32(id.x), f32(id.y));
     var uv = (fragCoord + sample_square(&rng_state)) / vec2(rez);
 
-    // Camera
     var lookfrom = vec3(uniforms[7], uniforms[8], uniforms[9]);
     var lookat = vec3(uniforms[23], uniforms[24], uniforms[25]);
 
-    // Get camera
-    var cam = get_camera(lookfrom, lookat, vec3(0.0, 1.0, 0.0), uniforms[10], 1.0, uniforms[6], uniforms[5]);
+    var camera = get_camera(lookfrom, lookat, vec3(0.0, 1.0, 0.0), uniforms[10], 1.0, uniforms[6], uniforms[5]);
     var samples_per_pixel = i32(uniforms[4]);
 
     var color = vec3f(0.0);
     for (var i = 0; i < samples_per_pixel; i+=1) {
-        let ray = get_ray(cam, uv, &rng_state);
+        let ray = get_ray(camera, uv, &rng_state);
         color += trace(ray, &rng_state);
     }
 
@@ -364,9 +360,8 @@ fn render(@builtin(global_invocation_id) id : vec3u)
     var color_out = vec4(linear_to_gamma(color), 1.0);
     var map_fb = mapfb(id.xy, rez);
     
-    // 5. Accumulate the color
-    var should_accumulate = uniforms[3];
+    var accumulate = uniforms[3];
 
-    rtfb[map_fb] = rtfb[map_fb] * should_accumulate + color_out;
+    rtfb[map_fb] = rtfb[map_fb] * accumulate + color_out;
     fb[map_fb] = rtfb[map_fb] / rtfb[map_fb].w;
 }
