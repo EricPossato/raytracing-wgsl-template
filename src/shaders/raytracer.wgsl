@@ -229,10 +229,6 @@ fn metal(normal : vec3f, direction: vec3f, fuzz: f32, random_sphere: vec3f) -> m
   return material_behaviour(true, after_fuzz);
 }
 
-fn dielectric(normal : vec3f, r_direction: vec3f, refraction_index: f32, frontface: bool, random_sphere: vec3f, fuzz: f32, rng_state: ptr<function, u32>) -> material_behaviour
-{  
-  return material_behaviour(false, vec3f(0.0));
-}
 
 fn emmisive(color: vec3f, light: f32) -> material_behaviour
 {
@@ -273,7 +269,6 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
             light_color += accumulated_color * emissive_behaviour.direction;
             break;
         }
-
         else{
           if (specular_prob < specular) {
               var metal_response = metal(record.normal, current_ray.direction, absorption, rng_next_vec3_in_unit_sphere(rng_state));
@@ -283,7 +278,7 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
             var lambertian_response = lambertian(record.normal, absorption, rng_next_vec3_in_unit_sphere(rng_state), rng_state);
             behaviour = lambertian_response;
           }
- 
+          accumulated_color *= mix(record.object_color.xyz,vec3f(1.0), specular); 
         }
         
         if (behaviour.scatter) {
