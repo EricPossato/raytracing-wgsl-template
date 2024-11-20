@@ -229,6 +229,36 @@ fn metal(normal : vec3f, direction: vec3f, fuzz: f32, random_sphere: vec3f) -> m
   return material_behaviour(true, after_fuzz);
 }
 
+fn dielectric(normal: vec3f, r_direction: vec3f, refraction_index: f32, frontface: bool, random_sphere: vec3f, fuzz: f32, rng_state: ptr<function, u32>) -> material_behaviour {
+
+    let ref_ratio = select(refraction_index, 1.0 / refraction_index, frontface);
+
+    let unit_direction = normalize(r_direction);
+
+    // Calculate cosine and sine of the angle between the ray and the normal
+    var cos_theta = dot(-unit_direction, normal);
+    cos_theta = min(cos_theta, 1.0);
+    let sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+
+    let not_refract = ref_ratio * sin_theta > 1.0;
+
+    var r0 = (1.0 - ref_ratio) / (1.0 + ref_ratio);
+    r0 = r0 * r0;
+    let ref_prob = r0 + (1.0 - r0) * pow(1.0 - cos_theta, 5.0);
+
+    // Decide whether to reflect or refract
+    var direction: vec3f;
+    if (not_refract || ref_prob > rng_next_float(rng_state)) {
+        direction = reflect(unit_direction, normal);
+    } else {
+        let ref_perpendicular = ref_ratio * (unit_direction + cos_theta * normal);
+        let ref_parallel = -sqrt(abs(1.0 - dot(ref_perpendicular, ref_perpendicular))) * normal;
+        direction = ref_perpendicular + ref_parallel;
+    }
+
+    return material_behaviour(true, normalize(direction));
+}
 
 fn emmisive(color: vec3f, light: f32) -> material_behaviour
 {
@@ -268,6 +298,12 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
             var emissive_behaviour = emmisive(record.object_color.xyz, light);
             light_color += accumulated_color * emissive_behaviour.direction;
             break;
+        }
+        if (smoothness < 0.0) {
+            // Dielectric (transparent) material
+            var dielectric_response = dielectric(record.normal, current_ray.direction, specular, record.frontface, rng_next_vec3_in_unit_sphere(rng_state), absorption, rng_state); 
+            behaviour = dielectric_response;
+            record.p = record.p - 0.01 * record.normal;
         }
         else{
           if (specular_prob < specular) {
