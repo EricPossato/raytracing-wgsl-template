@@ -20,48 +20,34 @@ fn hit_sphere(center: vec3f, radius: f32, r: ray, record: ptr<function, hit_reco
     return false;
 }
 
-fn hit_quad(r: ray, Q: vec4f, u: vec4f, v: vec4f, record: ptr<function, hit_record>, max: f32)
-{
-  var n = cross(u.xyz, v.xyz);
-  var normal = normalize(n);
-  var D = dot(normal, Q.xyz);
-  var w = n / dot(n.xyz, n.xyz);
+fn hit_quad(r: ray, Q: vec4f, u: vec4f, v: vec4f, record: ptr<function, hit_record>, max: f32) -> bool {
+    let n = normalize(cross(u.xyz, v.xyz));
+    let denom = dot(n, r.direction);
+    if (abs(denom) > RAY_TMIN) {
+        let t = dot(Q.xyz - r.origin, n) / denom;
+        if (t > RAY_TMIN && t < max) {
+            let p = ray_at(r, t);
+            let d = p - Q.xyz;
+            let dot_uu = dot(u.xyz, u.xyz);
+            let dot_uv = dot(u.xyz, v.xyz);
+            let dot_vv = dot(v.xyz, v.xyz);
+            let dot_du = dot(d, u.xyz);
+            let dot_dv = dot(d, v.xyz);
 
-  var denom = dot(normal, r.direction);
-  if (abs(denom) < 0.0001)
-  {
-    record.hit_anything = false;
-    return;
-  }
+            let inv_denom = 1.0 / (dot_uu * dot_vv - dot_uv * dot_uv);
+            let u_coord = (dot_vv * dot_du - dot_uv * dot_dv) * inv_denom;
+            let v_coord = (dot_uu * dot_dv - dot_uv * dot_du) * inv_denom;
 
-  var t = (D - dot(normal, r.origin)) / denom;
-  if (t < RAY_TMIN || t > max)
-  {
-    record.hit_anything = false;
-    return;
-  }
-
-  var intersection = ray_at(r, t);
-  var planar_hitpt_vector = intersection - Q.xyz;
-  var alpha = dot(w, cross(planar_hitpt_vector, v.xyz));
-  var beta = dot(w, cross(u.xyz, planar_hitpt_vector));
-
-  if (alpha < 0.0 || alpha > 1.0 || beta < 0.0 || beta > 1.0)
-  {
-    record.hit_anything = false;
-    return;
-  }
-
-  if (dot(normal, r.direction) > 0.0)
-  {
-    record.hit_anything = false;
-    return;
-  }
-
-  record.t = t;
-  record.p = intersection;
-  record.normal = normal;
-  record.hit_anything = true;
+            if (u_coord >= 0.0 && u_coord <= 1.0 && v_coord >= 0.0 && v_coord <= 1.0) {
+                (*record).t = t;
+                (*record).p = p;
+                (*record).normal = n;
+                (*record).hit_anything = true;
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 fn hit_triangle(r: ray, v0: vec3f, v1: vec3f, v2: vec3f, record: ptr<function, hit_record>, max: f32)
