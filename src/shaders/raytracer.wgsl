@@ -179,6 +179,29 @@ fn check_ray_collision(r: ray, max: f32) -> hit_record
     }
   }
 
+    for (var i = 0; i < boxesCount; i++)
+    {
+      var box = boxesb[i];
+      if (hit_box(r, box.center.xyz, box.radius.xyz, box.rotation.xyz, &local_record, closest) && local_record.t < closest) {
+          closest = local_record.t; 
+          record = local_record;     
+          record.object_color = box.color;
+          record.object_material = box.material;
+        }
+    }
+
+
+
+  for (var i = 0; i < quadsCount; i++)
+  {
+    var quad = quadsb[i];
+    if (hit_quad(r, quad.Q, quad.u, quad.v, &record, max) && record.t < closest){
+      closest = record.t;
+      record.object_color = quad.color;
+      record.object_material = quad.material;
+    };
+  }
+
   record.frontface = dot(r.direction, record.normal) < 0.0;
   record.normal = select(-record.normal , record.normal,record.frontface);
 
