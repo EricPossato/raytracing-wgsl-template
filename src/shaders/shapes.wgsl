@@ -1,6 +1,23 @@
-fn hit_sphere(center: vec3f, radius: f32, r: ray, record: ptr<function, hit_record>, max: f32)
-{
+fn hit_sphere(center: vec3f, radius: f32, r: ray, record: ptr<function, hit_record>, max: f32) -> bool {
+    let oc = r.origin - center;
+    let a = dot(r.direction, r.direction);
+    let b = dot(oc, r.direction);
+    let c = dot(oc, oc) - radius * radius;
+    let disc = b * b - a * c;
 
+    if (disc <= 0.0) {
+        return false;
+    }
+    let sqrt_disc = sqrt(disc);
+    let t = (-b - sqrt_disc) / a;
+    if (t < max && t > RAY_TMIN) {
+        (*record).t = t;
+        (*record).p = ray_at(r, t);
+        (*record).normal = ((*record).p - center) / radius;
+        (*record).hit_anything = true;
+        return true;
+    }
+    return false;
 }
 
 fn hit_quad(r: ray, Q: vec4f, u: vec4f, v: vec4f, record: ptr<function, hit_record>, max: f32)
