@@ -165,20 +165,6 @@ fn check_ray_collision(r: ray, max: f32) -> hit_record
   record.hit_anything = false;
   var local_record = hit_record(RAY_TMAX, vec3f(0.0), vec3f(0.0), vec4f(0.0), vec4f(0.0), false, false);;
 
-
-
-  for (var i = 0; i < spheresCount; i+=1){
-    var sphere = spheresb[i];
-    var center = vec3(sphere.transform.x, sphere.transform.y, sphere.transform.z);
-    var radius = sphere.transform.w;
-    
-    if(hit_sphere(center, radius, r, &record, closest) && record.t < closest) {
-      closest = record.t;  // Update closest intersection distance
-      record.object_color = sphere.color;
-      record.object_material = sphere.material;
-    }
-  }
-
     for (var i = 0; i < boxesCount; i+=1)
     {
       var box = boxesb[i];
@@ -200,6 +186,18 @@ fn check_ray_collision(r: ray, max: f32) -> hit_record
       record.object_color = quad.color;
       record.object_material = quad.material;
     };
+  }
+
+  for (var i = 0; i < spheresCount; i+=1){
+    var sphere = spheresb[i];
+    var center = vec3(sphere.transform.x, sphere.transform.y, sphere.transform.z);
+    var radius = sphere.transform.w;
+    
+    if(hit_sphere(center, radius, r, &record, closest) && record.t < closest) {
+      closest = record.t;  // Update closest intersection distance
+      record.object_color = sphere.color;
+      record.object_material = sphere.material;
+    }
   }
 
   record.frontface = dot(r.direction, record.normal) < 0.0;
