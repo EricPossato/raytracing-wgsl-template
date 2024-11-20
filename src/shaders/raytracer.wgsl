@@ -167,7 +167,7 @@ fn check_ray_collision(r: ray, max: f32) -> hit_record
 
 
 
-  for (var i = 0; i < spheresCount; i++){
+  for (var i = 0; i < spheresCount; i+=1){
     var sphere = spheresb[i];
     var center = vec3(sphere.transform.x, sphere.transform.y, sphere.transform.z);
     var radius = sphere.transform.w;
@@ -179,7 +179,7 @@ fn check_ray_collision(r: ray, max: f32) -> hit_record
     }
   }
 
-    for (var i = 0; i < boxesCount; i++)
+    for (var i = 0; i < boxesCount; i+=1)
     {
       var box = boxesb[i];
       if (hit_box(r, box.center.xyz, box.radius.xyz, box.rotation.xyz, &local_record, closest) && local_record.t < closest) {
@@ -192,7 +192,7 @@ fn check_ray_collision(r: ray, max: f32) -> hit_record
 
 
 
-  for (var i = 0; i < quadsCount; i++)
+  for (var i = 0; i < quadsCount; i+=1)
   {
     var quad = quadsb[i];
     if (hit_quad(r, quad.Q, quad.u, quad.v, &record, max) && record.t < closest){
@@ -270,14 +270,14 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
     var max_bounces = i32(uniforms[2]);
     var accumulated_color = vec3f(1.0);
     var light_color = vec3f(0.0);
-    var current_ray = r;
+    var active_ray = r;
 
     var background_color1 = int_to_rgb(i32(uniforms[11]));
     var background_color2 = int_to_rgb(i32(uniforms[12]));
 
-    for (var bounce = 0; bounce < max_bounces; bounce++) {
-        // Check if the ray hits any objects in the scene
-        var record = check_ray_collision(current_ray, RAY_TMAX);
+    for (var bounce = 0; bounce < max_bounces; bounce+=1) {
+
+        var record = check_ray_collision(active_ray, RAY_TMAX);
         var smoothness = record.object_material.x; // =>0 -> metal, <0 -> dielectric
         var absorption = record.object_material.y; // = fuzz
         var specular = record.object_material.z;
@@ -289,7 +289,7 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
 
 
         if (!record.hit_anything) {
-            light_color += accumulated_color * environment_color(current_ray.direction, background_color1, background_color2);
+            light_color += accumulated_color * environment_color(active_ray.direction, background_color1, background_color2);
             break;
         }
         
@@ -300,14 +300,15 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
             break;
         }
         if (smoothness < 0.0) {
-            // Dielectric (transparent) material
-            var dielectric_response = dielectric(record.normal, current_ray.direction, specular, record.frontface, rng_next_vec3_in_unit_sphere(rng_state), absorption, rng_state); 
+            // Dielectric material
+            var dielectric_response = dielectric(record.normal, active_ray.direction, specular, record.frontface, rng_next_vec3_in_unit_sphere(rng_state), absorption, rng_state); 
             behaviour = dielectric_response;
             record.p = record.p - 0.01 * record.normal;
         }
         else{
+          // metal 
           if (specular_prob < specular) {
-              var metal_response = metal(record.normal, current_ray.direction, absorption, rng_next_vec3_in_unit_sphere(rng_state));
+              var metal_response = metal(record.normal, active_ray.direction, absorption, rng_next_vec3_in_unit_sphere(rng_state));
               behaviour = metal_response;
           } else {
           // lambertian
@@ -318,7 +319,7 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
         }
         
         if (behaviour.scatter) {
-            current_ray = ray(record.p, normalize(behaviour.direction));
+            active_ray = ray(record.p, normalize(behaviour.direction));
             if (smoothness <= 0.0) {
                 accumulated_color *= record.object_color.xyz;
             }
@@ -354,7 +355,7 @@ fn render(@builtin(global_invocation_id) id : vec3u)
     var samples_per_pixel = i32(uniforms[4]);
 
     var color = vec3f(0.0);
-    for (var i = 0; i < samples_per_pixel; i++) {
+    for (var i = 0; i < samples_per_pixel; i+=1) {
         let ray = get_ray(cam, uv, &rng_state);
         color += trace(ray, &rng_state);
     }
