@@ -211,27 +211,65 @@ fn dielectric(normal : vec3f, r_direction: vec3f, refraction_index: f32, frontfa
 
 fn emmisive(color: vec3f, light: f32) -> material_behaviour
 {
-  return material_behaviour(false, vec3f(0.0));
+  return material_behaviour(false, color*light);
 }
 
-fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f
-{
-  var maxbounces = i32(uniforms[2]);
-  var light = vec3f(0.0);
-  var color = vec3f(1.0);
-  var r_ = r;
-  
-  var backgroundcolor1 = int_to_rgb(i32(uniforms[11]));
-  var backgroundcolor2 = int_to_rgb(i32(uniforms[12]));
-  var behaviour = material_behaviour(true, vec3f(0.0));
+fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
 
-  for (var j = 0; j < maxbounces; j = j + 1)
-  {
+    var max_bounces = i32(uniforms[2]);
+    var accumulated_color = vec3f(1.0);
+    var light_color = vec3f(0.0);
+    var current_ray = r;
 
-  }
+    var background_color1 = int_to_rgb(i32(uniforms[11]));
+    var background_color2 = int_to_rgb(i32(uniforms[12]));
 
-  return light;
+    for (var bounce = 0; bounce < max_bounces; bounce++) {
+        // Check if the ray hits any objects in the scene
+        var record = check_ray_collision(current_ray, RAY_TMAX);
+        var smoothness = record.object_material.x; // =>0 -> metal, <0 -> dielectric
+        var absorption = record.object_material.y; // = fuzz
+        var specular = record.object_material.z;
+        var light = record.object_material.w;
+
+        var specular_prob = rng_next_float(rng_state);
+
+        var behaviour : material_behaviour;
+
+
+        if (!record.hit_anything) {
+            light_color += accumulated_color * environment_color(current_ray.direction, background_color1, background_color2);
+            break;
+        }
+        
+        // emissive
+        if (light > 0.0) {
+            var emissive_behaviour = emmisive(record.object_color.xyz, light);
+            light_color += accumulated_color * emissive_behaviour.direction;
+            break;
+        }
+
+        else{
+          // lambertian
+            var lambertian_response = lambertian(record.normal, absorption, rng_next_vec3_in_unit_sphere(rng_state), rng_state);
+            behaviour = lambertian_response;
+ 
+        }
+        
+        if (behaviour.scatter) {
+            current_ray = ray(record.p, normalize(behaviour.direction));
+            if (smoothness <= 0.0) {
+                accumulated_color *= record.object_color.xyz;
+            }
+        } else {
+            break;
+        }
+    }
+
+    return light_color;
 }
+
+
 
 @compute @workgroup_size(THREAD_COUNT, THREAD_COUNT, 1)
 fn render(@builtin(global_invocation_id) id : vec3u)
@@ -254,13 +292,14 @@ fn render(@builtin(global_invocation_id) id : vec3u)
     var cam = get_camera(lookfrom, lookat, vec3(0.0, 1.0, 0.0), uniforms[10], 1.0, uniforms[6], uniforms[5]);
     var samples_per_pixel = i32(uniforms[4]);
 
-    var color = vec3(rng_next_float(&rng_state), rng_next_float(&rng_state), rng_next_float(&rng_state));
+    var color = vec3f(0.0);
+    for (var i = 0; i < samples_per_pixel; i++) {
+        let ray = get_ray(cam, uv, &rng_state);
+        color += trace(ray, &rng_state);
+    }
 
-    // Steps:
-    // 1. Loop for each sample per pixel
-    // 2. Get ray
-    // 3. Call trace function
-    // 4. Average the color
+    color /= f32(samples_per_pixel);
+    var frame_weight = 1.0 / f32(time);
 
     var color_out = vec4(linear_to_gamma(color), 1.0);
     var map_fb = mapfb(id.xy, rez);
@@ -268,7 +307,6 @@ fn render(@builtin(global_invocation_id) id : vec3u)
     // 5. Accumulate the color
     var should_accumulate = uniforms[3];
 
-    // Set the color to the framebuffer
-    rtfb[map_fb] = color_out;
-    fb[map_fb] = color_out;
+    rtfb[map_fb] = rtfb[map_fb] * should_accumulate + color_out;
+    fb[map_fb] = rtfb[map_fb] / rtfb[map_fb].w;
 }
