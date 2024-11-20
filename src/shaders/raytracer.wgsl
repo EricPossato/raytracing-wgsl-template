@@ -224,7 +224,9 @@ fn lambertian(normal: vec3f, absorption: f32, random_sphere: vec3f, rng_state: p
 
 fn metal(normal : vec3f, direction: vec3f, fuzz: f32, random_sphere: vec3f) -> material_behaviour
 {
-  return material_behaviour(false, vec3f(0.0));
+  var after_reflect = reflect(normalize(direction), normal);
+  var after_fuzz = after_reflect + fuzz * random_sphere;
+  return material_behaviour(true, after_fuzz);
 }
 
 fn dielectric(normal : vec3f, r_direction: vec3f, refraction_index: f32, frontface: bool, random_sphere: vec3f, fuzz: f32, rng_state: ptr<function, u32>) -> material_behaviour
@@ -273,9 +275,14 @@ fn trace(r: ray, rng_state: ptr<function, u32>) -> vec3f {
         }
 
         else{
+          if (specular_prob < specular) {
+              var metal_response = metal(record.normal, current_ray.direction, absorption, rng_next_vec3_in_unit_sphere(rng_state));
+              behaviour = metal_response;
+          } else {
           // lambertian
             var lambertian_response = lambertian(record.normal, absorption, rng_next_vec3_in_unit_sphere(rng_state), rng_state);
             behaviour = lambertian_response;
+          }
  
         }
         
