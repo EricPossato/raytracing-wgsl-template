@@ -134,7 +134,7 @@ fn get_camera(lookfrom: vec3f, lookat: vec3f, vup: vec3f, vfov: f32, aspect_rati
   return camera;
 }
 
-fn envoriment_color(direction: vec3f, color1: vec3f, color2: vec3f) -> vec3f
+fn environment_color(direction: vec3f, color1: vec3f, color2: vec3f) -> vec3f
 {
   var unit_direction = normalize(direction);
   var t = 0.5 * (unit_direction.y + 1.0);
@@ -186,9 +186,17 @@ fn check_ray_collision(r: ray, max: f32) -> hit_record
   return record;
 }
 
-fn lambertian(normal : vec3f, absorption: f32, random_sphere: vec3f, rng_state: ptr<function, u32>) -> material_behaviour
-{
-  return material_behaviour(true, vec3f(0.0));
+fn lambertian(normal: vec3f, absorption: f32, random_sphere: vec3f, rng_state: ptr<function, u32>) -> material_behaviour {
+    // Get a random scatter direction by adding a random vector in a unit sphere to the normal
+    var scatter_direction = normal + rng_next_vec3_in_unit_sphere(rng_state);
+
+    // If the scatter direction is very small, reset it to the normal (to avoid degenerate rays)
+    if (length(scatter_direction) < 1e-5) {
+        scatter_direction = normal;
+    }
+
+
+    return material_behaviour(true, normalize(scatter_direction));
 }
 
 fn metal(normal : vec3f, direction: vec3f, fuzz: f32, random_sphere: vec3f) -> material_behaviour
