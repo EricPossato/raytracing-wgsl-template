@@ -159,10 +159,31 @@ fn check_ray_collision(r: ray, max: f32) -> hit_record
   var trianglesCount = i32(uniforms[22]);
   var meshCount = i32(uniforms[27]);
 
-  var record = hit_record(RAY_TMAX, vec3f(0.0), vec3f(0.0), vec4f(0.0), vec4f(0.0), false, false);
-  var closest = record;
+  var record = hit_record();
+  var closest = max;
+  record.t = max;
+  record.hit_anything = false;
+  var local_record = hit_record(RAY_TMAX, vec3f(0.0), vec3f(0.0), vec4f(0.0), vec4f(0.0), false, false);;
 
-  return closest;
+
+
+  for (var i = 0; i < spheresCount; i++){
+    var sphere = spheresb[i];
+    var center = vec3(sphere.transform.x, sphere.transform.y, sphere.transform.z);
+    var radius = sphere.transform.w;
+    
+    if(hit_sphere(center, radius, r, &record, closest) && record.t < closest) {
+      closest = record.t;  // Update closest intersection distance
+      record.object_color = sphere.color;
+      record.object_material = sphere.material;
+    }
+  }
+
+  record.frontface = dot(r.direction, record.normal) < 0.0;
+  record.normal = select(-record.normal , record.normal,record.frontface);
+
+
+  return record;
 }
 
 fn lambertian(normal : vec3f, absorption: f32, random_sphere: vec3f, rng_state: ptr<function, u32>) -> material_behaviour
