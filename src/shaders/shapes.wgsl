@@ -1,15 +1,15 @@
 fn hit_sphere(center: vec3f, radius: f32, r: ray, record: ptr<function, hit_record>, max: f32) -> bool {
-    let oc = r.origin - center;
-    let a = dot(r.direction, r.direction);
-    let b = dot(oc, r.direction);
-    let c = dot(oc, oc) - radius * radius;
-    let disc = b * b - a * c;
+    var oc = r.origin - center;
+    var a = dot(r.direction, r.direction);
+    var b = dot(oc, r.direction);
+    var c = dot(oc, oc) - radius * radius;
+    var disc = b * b - a * c;
 
     if (disc <= 0.0) {
         return false;
     }
-    let sqrt_disc = sqrt(disc);
-    let t = (-b - sqrt_disc) / a;
+    var sqrt_disc = sqrt(disc);
+    var t = (-b - sqrt_disc) / a;
     if (t < max && t > RAY_TMIN) {
         (*record).t = t;
         (*record).p = ray_at(r, t);
@@ -21,24 +21,25 @@ fn hit_sphere(center: vec3f, radius: f32, r: ray, record: ptr<function, hit_reco
 }
 
 fn hit_quad(r: ray, Q: vec4f, u: vec4f, v: vec4f, record: ptr<function, hit_record>, max: f32) -> bool {
-    let n = normalize(cross(u.xyz, v.xyz));
-    let denom = dot(n, r.direction);
-    if (abs(denom) > RAY_TMIN) {
-        let t = dot(Q.xyz - r.origin, n) / denom;
+    var n = cross(u.xyz, v.xyz);
+    n = normalize(n);
+    var den = dot(n, r.direction);
+    if (abs(den) > RAY_TMIN) {
+        var t = dot(Q.xyz - r.origin, n) / den;
         if (t > RAY_TMIN && t < max) {
             let p = ray_at(r, t);
             let d = p - Q.xyz;
-            let dot_uu = dot(u.xyz, u.xyz);
-            let dot_uv = dot(u.xyz, v.xyz);
-            let dot_vv = dot(v.xyz, v.xyz);
-            let dot_du = dot(d, u.xyz);
-            let dot_dv = dot(d, v.xyz);
+            let uu_dot = dot(u.xyz, u.xyz);
+            let uv_dot = dot(u.xyz, v.xyz);
+            let vv_dot = dot(v.xyz, v.xyz);
+            let du_dot = dot(d, u.xyz);
+            let dv_dot = dot(d, v.xyz);
 
-            let inv_denom = 1.0 / (dot_uu * dot_vv - dot_uv * dot_uv);
-            let u_coord = (dot_vv * dot_du - dot_uv * dot_dv) * inv_denom;
-            let v_coord = (dot_uu * dot_dv - dot_uv * dot_du) * inv_denom;
+            let inv_den = 1.0 / (uu_dot * vv_dot - uv_dot * uv_dot);
+            let u_coord = (vv_dot * du_dot - uv_dot * dv_dot) * inv_den;
+            let v_coord = (uu_dot * dv_dot - uv_dot * du_dot) * inv_den;
 
-            if (u_coord >= 0.0 && u_coord <= 1.0 && v_coord >= 0.0 && v_coord <= 1.0) {
+            if (u_coord >= 0.0 && v_coord >= 0.0 && u_coord <= 1.0  && v_coord <= 1.0) {
                 (*record).t = t;
                 (*record).p = p;
                 (*record).normal = n;
@@ -83,8 +84,11 @@ fn hit_triangle(r: ray, v0: vec3f, v1: vec3f, v2: vec3f, record: ptr<function, h
   record.hit_anything = true;
 }
 
-fn hit_box(r: ray, center: vec3f, rad: vec3f, record: ptr<function, hit_record>, t_max: f32)
+fn hit_box(r: ray, center: vec3f, rad: vec3f, rotation: vec3f, record: ptr<function, hit_record>, t_max: f32) -> bool
 {
+  var rot = rotation.xyz;//assuming rotation received is already in radians
+  var quat = quaternion_from_euler(rot);
+
   var m = 1.0 / r.direction;
   var n = m * (r.origin - center);
   var k = abs(m) * rad;
@@ -98,14 +102,22 @@ fn hit_box(r: ray, center: vec3f, rad: vec3f, record: ptr<function, hit_record>,
   if (tN > tF || tF < 0.0)
   {
     record.hit_anything = false;
-    return;
+    return false;
   }
 
-  var t = tN;
+  var t: f32;
+  if (tN > 0.0)
+  {
+    t = tN;
+  }
+  else{
+    t = tF;
+  }
+
   if (t < RAY_TMIN || t > t_max)
   {
     record.hit_anything = false;
-    return;
+    return false;
   }
 
   record.t = t;
@@ -113,5 +125,5 @@ fn hit_box(r: ray, center: vec3f, rad: vec3f, record: ptr<function, hit_record>,
   record.normal = -sign(r.direction) * step(t1.yzx, t1.xyz) * step(t1.zxy, t1.xyz);
   record.hit_anything = true;
 
-  return;
+  return true;
 }
